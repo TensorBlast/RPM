@@ -39,6 +39,7 @@ public class Agent {
     public Agent() {
         rScores = new HashMap<String, Integer>();
         rScores.put("shape", 5);
+        rScores.put("alignment",4);
         rScores.put("fill", 3);
         rScores.put("angle",4);
         rScores.put("size", 2);
@@ -89,6 +90,7 @@ public class Agent {
             RavensFigure figure3 = figures.get("3");
             RavensFigure figure4 = figures.get("4");
             RavensFigure figure5 = figures.get("5");
+            RavensFigure figure6 = figures.get("6");
 
             /**
              * Setting up the frame data structure other than the internal relationships between objects etc.
@@ -104,13 +106,26 @@ public class Agent {
                     frames.put(obj.getName(), new Frame(obj, fig.getName()));
                 }
             }
+            HashMap<String, Frame> figureAFrames = FigFrames.get("A");
+            HashMap<String, Frame> figureBFrames = FigFrames.get("B");
+            HashMap<String, Frame> figureCFrames = FigFrames.get("C");
+            HashMap<String, Frame> figure1Frames = FigFrames.get("1");
+            HashMap<String, Frame> figure2Frames = FigFrames.get("1");
+            HashMap<String, Frame> figure3Frames = FigFrames.get("3");
+            HashMap<String, Frame> figure4Frames = FigFrames.get("4");
+            HashMap<String, Frame> figure5Frames = FigFrames.get("5");
+            HashMap<String, Frame> figure6Frames = FigFrames.get("6");
+
             /**
              * Match objects from figures A to B and from A to C
              * Later we match them from C to answer choices
              */
             objectmatch(figureA, figureB);
-            HashMap<String, Frame> figBframes = FigFrames.get("B");
-            for(Frame frame: figBframes.values())
+            for(Frame fr: figureBFrames.values())
+            {
+                fr.formRelationships();
+            }
+            for(Frame frame: figureBFrames.values())
             {
                 System.out.println(frame + "----> problem:"+problemName);
             }
@@ -138,6 +153,8 @@ public class Agent {
             {
                 int currscore = 0;
                 HashMap<String, String> attrB = objectB.getAttributes();
+                if(attrA.size() == attrB.size())
+                    currscore += 10;
                 for(String attr: rScores.keySet())
                 {
                     if(attrA.containsKey(attr) && attrB.containsKey(attr) && attrA.get(attr).equals(attrB.get(attr)))
@@ -154,7 +171,6 @@ public class Agent {
             if(nomatch)
             {
                 FigFrames.get(figureA.getName()).get(objectA.getName()).transformations.put("deleted",null); //marking it as deleted since no match
-                continue;
             }
             Map.Entry<String, Integer> maxMatch = (Map.Entry<String, Integer>)scores.entrySet().toArray()[0];
             for(Map.Entry<String, Integer> a: scores.entrySet())
@@ -166,9 +182,27 @@ public class Agent {
             }
             // We have a match for objectA in figureB. Now change name of matched obj to match objectA
             HashMap<String, Frame> figBFrames = FigFrames.get(figureB.getName());
-            figBFrames.get(maxMatch.getKey()).setName(objectA.getName());       //Set the new name of frame in figureB
-            figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
-            figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
+            Frame targetFrame = figBFrames.get(maxMatch.getKey());
+            if(targetFrame!=null) {
+                targetFrame.setName(objectA.getName());       //Set the new name of frame in figureB
+                figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
+                figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
+                /**
+                 * Fix relationship names in entire stupid frame structure
+                 */
+                for(Frame fr: figBFrames.values())
+                {
+                    for(Map.Entry<String,String> entry : fr.getAttributes().entrySet())
+                    {
+                        if(entry.getKey().equals("inside") || entry.getKey().equals("above") || entry.getKey().equals("left-of") ||
+                                entry.getKey().equals("overlaps"))
+                            if(entry.getValue().contains(maxMatch.getKey()))
+                            {
+                                fr.getAttributes().put(entry.getKey(),entry.getValue().replace(maxMatch.getKey(),objectA.getName()));
+                            }
+                    }
+                }
+            }
         }
         return 0;
     }
@@ -219,9 +253,11 @@ public class Agent {
                     Frame Aisinsidethis = FigFrames.get(fromFigure).get(Ain);
                     if (Aisinsidethis != null) {
                         relationships.get("inside").add(Aisinsidethis);
+                        System.out.println("Adding relationships to :"+this.name);
                     } else {
                         System.out.println("No frame found for attribute inside: " + this.name + "" +
                                 "despite attribute hashmap containing valid value: " + Ain);
+                        System.out.println(this.attributes.get("inside"));
                     }
                 }
             }
