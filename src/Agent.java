@@ -28,6 +28,7 @@ public class Agent {
 
     private HashMap<String, Integer> rScores;
     private HashMap<String, HashMap<String,Frame>> FigFrames;
+    private static RavensProblem prob;
     /**
      * The default constructor for your Agent. Make sure to execute any
      * processing necessary before your Agent starts solving problems here.
@@ -77,9 +78,12 @@ public class Agent {
      */
     public int Solve(RavensProblem problem) {
 
+        prob = problem;
+        int bestGuess = 2;
         String problemName = problem.getName();
         String problemType = problem.getProblemType();
         HashMap<String, RavensFigure> figures = problem.getFigures();
+        //Hashmap transformation matrix: figure->object->figure->attribute-changes (encapsulated into frame)
         if( problemType.equals("2x2"))
         {
             RavensFigure figureA = figures.get("A");
@@ -99,6 +103,7 @@ public class Agent {
              */
             for(RavensFigure fig: figures.values())
             {
+                //For each figure, add the object->figure->attribute:changes transformation matrix
                 FigFrames.put(fig.getName(), new HashMap<String, Frame>());
                 HashMap<String, Frame> frames = FigFrames.get(fig.getName());
                 for(RavensObject obj: fig.getObjects().values())
@@ -121,18 +126,25 @@ public class Agent {
              * Later we match them from C to answer choices
              */
             objectmatch(figureA, figureB);
-            for(Frame fr: figureBFrames.values())
+            objectmatch(figureA, figureC);
+            for(Map.Entry<String,HashMap<String, Frame>> fr: FigFrames.entrySet())
             {
-                fr.formRelationships();
+                for(Frame f: fr.getValue().values())
+                {
+                    f.formRelationships();
+                }
             }
             for(Frame frame: figureBFrames.values())
             {
                 System.out.println(frame + "----> problem:"+problemName);
+                System.out.println("In FIGURE A:\n");
+                System.out.println(figureAFrames.get(frame.getName()));
             }
+
         }
         else
             System.out.println(problemType);
-        return -1;
+        return bestGuess;
     }
 
     /**
@@ -144,11 +156,22 @@ public class Agent {
      */
     public int objectmatch(RavensFigure figureA, RavensFigure figureB)
     {
+        boolean nomatch = true;
         for(RavensObject objectA: figureA.getObjects().values())
         {
-            boolean nomatch = true;
+            nomatch = true;
             HashMap<String, Integer> scores = new HashMap<>();
             HashMap<String, String> attrA = objectA.getAttributes();
+            /**
+             * Instantiating the transformation matric of inner class Frame for each frame in figureA
+             * to represent transformations to its corresponding object in figureB
+             */
+            for( Map.Entry<String, Frame> a: FigFrames.get(figureA.getName()).entrySet())
+            {
+                //Here we add the FigureB->{string:string} to show transformation from frame in figureA
+                //to figureB in terms of attribute:changes or 0 for none
+                a.getValue().transformationMatrix.put(figureB.getName(), new HashMap<String, String>());
+            }
             for(RavensObject objectB: figureB.getObjects().values())
             {
                 int currscore = 0;
@@ -157,12 +180,35 @@ public class Agent {
                     currscore += 10;
                 for(String attr: rScores.keySet())
                 {
-                    if(attrA.containsKey(attr) && attrB.containsKey(attr) && attrA.get(attr).equals(attrB.get(attr)))
-                    {
-                        currscore += rScores.get(attr);
-                        if(attr.equals("shape"))
+                    if(attrA.containsKey(attr) && attrB.containsKey(attr)) {
+                        if (attrA.get(attr).equals(attrB.get(attr))) {
+                            currscore += rScores.get(attr);
+                            if (attr.equals("shape")) {
+                                nomatch = false;
+                            }
+                        }
+                        else
                         {
-                            nomatch = false;
+                            if(attr.equals("inside"))
+                            {
+                                if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                    currscore += 5;
+                            }
+                            else if(attr.equals("above"))
+                            {
+                                if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                    currscore += 5;
+                            }
+                            else if(attr.equals("overlaps"))
+                            {
+                                if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                    currscore += 5;
+                            }
+                            else if(attr.equals("left-of"))
+                            {
+                                if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                    currscore += 5;
+                            }
                         }
                     }
                 }
@@ -170,36 +216,36 @@ public class Agent {
             }
             if(nomatch)
             {
-                FigFrames.get(figureA.getName()).get(objectA.getName()).transformations.put("deleted",null); //marking it as deleted since no match
+                System.out.println("NO MATCH WAS FOUND FOR OBJECT: "+objectA.getName()+objectA.getAttributes().get("shape")+" IN FIGURE: "+figureA.getName()
+                +" TO ANY OBJECT IN FIGURE: "+figureB.getName()+" FOR PROBLEM: "+Agent.prob.getName());
+                FigFrames.get(figureA.getName()).get(objectA.getName()).transformationMatrix.get(figureB.getName()).put("deleted","1"); //marking it as deleted since no match
             }
-            Map.Entry<String, Integer> maxMatch = (Map.Entry<String, Integer>)scores.entrySet().toArray()[0];
-            for(Map.Entry<String, Integer> a: scores.entrySet())
-            {
-                if(maxMatch.getValue().compareTo(a.getValue()) <= 0)
-                {
-                    maxMatch = a;
+            else {
+                Map.Entry<String, Integer> maxMatch = (Map.Entry<String, Integer>) scores.entrySet().toArray()[0];
+                for (Map.Entry<String, Integer> a : scores.entrySet()) {
+                    if (maxMatch.getValue().compareTo(a.getValue()) <= 0) {
+                        maxMatch = a;
+                    }
                 }
-            }
-            // We have a match for objectA in figureB. Now change name of matched obj to match objectA
-            HashMap<String, Frame> figBFrames = FigFrames.get(figureB.getName());
-            Frame targetFrame = figBFrames.get(maxMatch.getKey());
-            if(targetFrame!=null) {
-                targetFrame.setName(objectA.getName());       //Set the new name of frame in figureB
-                figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
-                figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
-                /**
-                 * Fix relationship names in entire stupid frame structure
-                 */
-                for(Frame fr: figBFrames.values())
-                {
-                    for(Map.Entry<String,String> entry : fr.getAttributes().entrySet())
-                    {
-                        if(entry.getKey().equals("inside") || entry.getKey().equals("above") || entry.getKey().equals("left-of") ||
-                                entry.getKey().equals("overlaps"))
-                            if(entry.getValue().contains(maxMatch.getKey()))
-                            {
-                                fr.getAttributes().put(entry.getKey(),entry.getValue().replace(maxMatch.getKey(),objectA.getName()));
-                            }
+                // We have a match for objectA in figureB. Now change name of matched obj to match objectA
+                HashMap<String, Frame> figBFrames = FigFrames.get(figureB.getName());
+                Frame targetFrame = figBFrames.get(maxMatch.getKey());
+                if (targetFrame != null) {
+                    targetFrame.setName(objectA.getName());       //Set the new name of frame in figureB
+                    figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
+                    figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
+                    /**
+                     * Fix relationship names in entire stupid frame structure
+                     * by changing the attributes hashmap for each affected frame in figureB
+                     */
+                    for (Frame fr : figBFrames.values()) {
+                        for (Map.Entry<String, String> entry : fr.getAttributes().entrySet()) {
+                            if (entry.getKey().equals("inside") || entry.getKey().equals("above") || entry.getKey().equals("left-of") ||
+                                    entry.getKey().equals("overlaps"))
+                                if (entry.getValue().contains(maxMatch.getKey())) {
+                                    fr.getAttributes().put(entry.getKey(), entry.getValue().replace(maxMatch.getKey(), objectA.getName()));
+                                }
+                        }
                     }
                 }
             }
@@ -224,14 +270,14 @@ public class Agent {
         String fromFigure;
         HashMap<String,String> attributes;
         HashMap<String, ArrayList<Frame>> relationships;
-        HashMap<String, Frame> transformations;
+        HashMap<String, HashMap<String, String>> transformationMatrix;
         public Frame(String name, String figure)
         {
             this.name = name;
             this.fromFigure = figure;
             attributes = new HashMap<>();
             relationships = new HashMap<>();
-            transformations = new HashMap<>();
+            transformationMatrix = new HashMap<>();
             relationships.put("inside", new ArrayList<Frame>());
             relationships.put("above", new ArrayList<Frame>());
             relationships.put("left-of", new ArrayList<Frame>());
@@ -313,7 +359,7 @@ public class Agent {
                     ", fromFigure='" + fromFigure + '\'' +
                     ", attributes=" + attributes +
                     ", relationships=" + relationships +
-                    ", transformations=" + transformations +
+                    ", transformations=" + transformationMatrix +
                     '}';
         }
     }
