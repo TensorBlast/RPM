@@ -134,6 +134,8 @@ public class Agent {
                     f.formRelationships();
                 }
             }
+            formTransformations(figureAFrames, figureBFrames);
+            formTransformations(figureAFrames, figureCFrames);
             for(Frame frame: figureBFrames.values())
             {
                 System.out.println(frame + "----> problem:"+problemName);
@@ -171,6 +173,7 @@ public class Agent {
                 //Here we add the FigureB->{string:string} to show transformation from frame in figureA
                 //to figureB in terms of attribute:changes or 0 for none
                 a.getValue().transformationMatrix.put(figureB.getName(), new HashMap<String, String>());
+                a.getValue().transformationScore.put(figureB.getName(), 0.0);
             }
             for(RavensObject objectB: figureB.getObjects().values())
             {
@@ -252,6 +255,129 @@ public class Agent {
         }
         return 0;
     }
+    public int formTransformations(HashMap<String, Frame> FigAframes, HashMap<String, Frame> FigBframes)
+    {
+        for(Map.Entry<String, Frame> FigAObj: FigAframes.entrySet())
+        {
+            String ObjAName = FigAObj.getKey();
+            Frame ObjA = FigAObj.getValue();
+            String FigBName = ((Frame)(FigBframes.values().toArray()[0])).fromFigure;
+
+            Frame ObjB_A = FigBframes.get(ObjAName);
+            if(ObjB_A == null)
+            {
+                ObjA.transformationMatrix.get(((Frame)FigBframes.values().toArray()[0]).fromFigure).put("deleted","1");
+            }
+            else
+            {
+                HashMap<String, String> attrA = ObjA.getAttributes();
+                HashMap<String, String> attrB = ObjB_A.getAttributes();
+
+                for(Map.Entry<String, Integer> rscore : rScores.entrySet()) {
+                    double oldScore = ObjA.transformationScore.get(FigBName);
+                    if(attrA.containsKey(rscore.getKey())) {
+                        if (attrB.containsKey(rscore.getKey())) {
+                            switch (rscore.getKey()) {
+                                case "shape":
+                                    if (attrA.get("shape").equals(attrB.get("shape"))) {
+                                        ObjA.transformationMatrix.get(FigBName).put("shape", "unchanged");
+                                        ObjA.transformationScore.put(FigBName, oldScore + (double) rscore.getValue());
+                                    } else {
+                                        ObjA.transformationMatrix.get(FigBName).put("shape", "changed");
+                                        ObjA.transformationScore.put(FigBName, oldScore - (double) rscore.getValue() / 2);
+                                    }
+                                    break;
+                                case "size":
+                                    if (attrA.get(rscore.getKey()).equals(attrB.get(rscore.getKey()))) {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "unchanged");
+                                        ObjA.transformationScore.put(FigBName, oldScore + rscore.getValue() * 1.1);
+                                    } else {
+                                        if (Agent.sizeCompare(attrA.get(rscore.getKey()), attrB.get(rscore.getKey())) < 0) {
+                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "increased");
+                                            ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.5);
+                                        } else {
+                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "decreased");
+                                            ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.5);
+                                        }
+                                    }
+                                    break;
+                                case "angle":
+                                    if (Math.abs(Integer.parseInt(attrA.get(rscore.getKey())) - Integer.parseInt(attrB.get(rscore.getKey()))) == 180) {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "reflected");
+                                        ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.4);
+                                    } else if (Math.abs(Integer.parseInt(attrA.get(rscore.getKey())) - Integer.parseInt(attrB.get(rscore.getKey()))) == 0) {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "unchanged");
+                                        ObjA.transformationScore.put(FigBName, oldScore + rscore.getValue());
+                                    } else {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "rotated");
+                                        ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.9);
+                                    }
+                                    break;
+                                case "fill":
+                                case "alignment":
+                                case "inside":
+                                case "above":
+                                case "overlaps":
+                                case "left-of":
+                                    if (attrA.get(rscore.getKey()).length() == attrB.get(rscore.getKey()).length()) {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "unchanged");
+                                        ObjA.transformationScore.put(FigBName, oldScore + rscore.getValue() * 1.5);
+                                    } else {
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "changed");
+                                        ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.7);
+                                    }
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue());
+                        }
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+    public static int sizeCompare(String sizeA, String sizeB)
+    {
+        int ret = 0;
+        switch(sizeA)
+        {
+            case "small":
+                if(sizeB.equals("medium") || sizeB.equals("large")
+                        || sizeB.equals("very large") || sizeB.equals("huge"))
+                {
+                    ret = -1;
+                }
+                else ret = 0;
+                break;
+            case "medium":
+                if(sizeB.equals("small"))
+                    ret = 1;
+                else
+                    ret = -1;
+                break;
+            case "large":
+                if(sizeB.equals("small") || sizeB.equals("medium"))
+                {
+                    ret = 1;
+                }
+                else ret = -1;
+                break;
+            case "very large":
+                if(sizeB.equals("huge"))
+                    ret = -1;
+                else ret = 1;
+                break;
+            case "huge":
+                if(sizeB.equals("huge"))
+                    ret = 0;
+                else ret = 1;
+                break;
+        }
+        return ret;
+    }
 
     private class Frame
     {
@@ -271,6 +397,7 @@ public class Agent {
         HashMap<String,String> attributes;
         HashMap<String, ArrayList<Frame>> relationships;
         HashMap<String, HashMap<String, String>> transformationMatrix;
+        HashMap<String, Double> transformationScore;
         public Frame(String name, String figure)
         {
             this.name = name;
@@ -278,6 +405,7 @@ public class Agent {
             attributes = new HashMap<>();
             relationships = new HashMap<>();
             transformationMatrix = new HashMap<>();
+            transformationScore = new HashMap<>();
             relationships.put("inside", new ArrayList<Frame>());
             relationships.put("above", new ArrayList<Frame>());
             relationships.put("left-of", new ArrayList<Frame>());
@@ -288,6 +416,7 @@ public class Agent {
             this(obj.getName(), figure);
             attributes = obj.getAttributes();
         }
+
         //Forming the frame data structure here with everything in figA
         public int formRelationships()
         {
@@ -354,13 +483,14 @@ public class Agent {
 
         @Override
         public String toString() {
-            return "Frame{" +
+            return ("Frame{" +
                     "name='" + name + '\'' +
                     ", fromFigure='" + fromFigure + '\'' +
                     ", attributes=" + attributes +
                     ", relationships=" + relationships +
-                    ", transformations=" + transformationMatrix +
-                    '}';
+                    ", transformationMatrix=" + transformationMatrix +
+                    ", transformationScore=" + transformationScore +
+                    '}').replace(',','\n');
         }
     }
 }
