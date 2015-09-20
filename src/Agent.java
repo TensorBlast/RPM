@@ -78,6 +78,8 @@ public class Agent {
      */
     public int Solve(RavensProblem problem) {
 
+        System.out.println("WE'RE SOLVING PROBLEM: "+problem.getName());
+        FigFrames = new HashMap<>();
         prob = problem;
         int bestGuess = 2;
         String problemName = problem.getName();
@@ -86,15 +88,24 @@ public class Agent {
         //Hashmap transformation matrix: figure->object->figure->attribute-changes (encapsulated into frame)
         if( problemType.equals("2x2"))
         {
+            System.out.println("WE'RE SOLVING PROBLEM: "+problem.getName());
             RavensFigure figureA = figures.get("A");
             RavensFigure figureB = figures.get("B");
             RavensFigure figureC = figures.get("C");
+
             RavensFigure figure1 = figures.get("1");
             RavensFigure figure2 = figures.get("2");
             RavensFigure figure3 = figures.get("3");
             RavensFigure figure4 = figures.get("4");
             RavensFigure figure5 = figures.get("5");
             RavensFigure figure6 = figures.get("6");
+            ArrayList<RavensFigure> answerChoices = new ArrayList<RavensFigure>();
+            answerChoices.add(figure1);
+            answerChoices.add(figure2);
+            answerChoices.add(figure3);
+            answerChoices.add(figure4);
+            answerChoices.add(figure5);
+            answerChoices.add(figure6);
 
             /**
              * Setting up the frame data structure other than the internal relationships between objects etc.
@@ -134,18 +145,37 @@ public class Agent {
                     f.formRelationships();
                 }
             }
-            formTransformations(figureAFrames, figureBFrames);
-            formTransformations(figureAFrames, figureCFrames);
-            for(Frame frame: figureBFrames.values())
+            formTransformations(figureAFrames, "A", figureBFrames, "B");
+            formTransformations(figureAFrames, "A", figureCFrames, "C");
+//            for(Frame frame: figureAFrames.values())
+//            {
+//                System.out.println(frame + "----> problem:"+problemName);
+//            }
+            HashMap<String, Double> answerscores = new HashMap<>();
+            for(RavensFigure answerchoice: answerChoices)
             {
-                System.out.println(frame + "----> problem:"+problemName);
-                System.out.println("In FIGURE A:\n");
-                System.out.println(figureAFrames.get(frame.getName()));
+                objectmatch(figureC, answerchoice);
+                formTransformations(figureCFrames,"C", FigFrames.get(answerchoice.getName()),answerchoice.getName());
+                double score = compareTranformations(figureAFrames, "B", figureCFrames, answerchoice.getName());
+                System.out.println("SCORE FOR A->B with C->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
+                answerscores.put(answerchoice.getName(),score);
             }
 
+            for(RavensFigure answerchoice: answerChoices)
+            {
+                objectmatch(figureB, answerchoice);
+                System.out.println("DOING FORMTRANS FOR "+answerchoice.getName());
+                formTransformations(figureBFrames,"B", FigFrames.get(answerchoice.getName()),answerchoice.getName());
+                double score = compareTranformations(figureAFrames, "C", figureBFrames, answerchoice.getName());
+                System.out.println("SCORE FOR A->C with B->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
+                answerscores.put(answerchoice.getName(),answerscores.get(answerchoice.getName())+score);
+            }
+            Map.Entry<String, Double> bestEntryGuess = maxHashEntry(answerscores);
+            bestGuess = Integer.parseInt(bestEntryGuess.getKey());
         }
         else
             System.out.println(problemType);
+
         return bestGuess;
     }
 
@@ -159,7 +189,7 @@ public class Agent {
     public int objectmatch(RavensFigure figureA, RavensFigure figureB)
     {
         boolean nomatch = true;
-        for(RavensObject objectA: figureA.getObjects().values())
+        for(Frame objectA: FigFrames.get(figureA.getName()).values())
         {
             nomatch = true;
             HashMap<String, Integer> scores = new HashMap<>();
@@ -168,14 +198,13 @@ public class Agent {
              * Instantiating the transformation matric of inner class Frame for each frame in figureA
              * to represent transformations to its corresponding object in figureB
              */
-            for( Map.Entry<String, Frame> a: FigFrames.get(figureA.getName()).entrySet())
-            {
-                //Here we add the FigureB->{string:string} to show transformation from frame in figureA
-                //to figureB in terms of attribute:changes or 0 for none
-                a.getValue().transformationMatrix.put(figureB.getName(), new HashMap<String, String>());
-                a.getValue().transformationScore.put(figureB.getName(), 0.0);
-            }
-            for(RavensObject objectB: figureB.getObjects().values())
+
+            //Here we add the FigureB->{string:string} to show transformation from frame in figureA
+            //to figureB in terms of attribute:changes or 0 for none
+            objectA.transformationMatrix.put(figureB.getName(), new HashMap<String, String>());
+            objectA.transformationScore.put(figureB.getName(), 0.0);
+
+            for(Frame objectB: FigFrames.get(figureB.getName()).values())
             {
                 int currscore = 0;
                 HashMap<String, String> attrB = objectB.getAttributes();
@@ -217,11 +246,20 @@ public class Agent {
                 }
                 scores.put(objectB.getName(), currscore);
             }
-            if(nomatch)
-            {
-                System.out.println("NO MATCH WAS FOUND FOR OBJECT: "+objectA.getName()+objectA.getAttributes().get("shape")+" IN FIGURE: "+figureA.getName()
-                +" TO ANY OBJECT IN FIGURE: "+figureB.getName()+" FOR PROBLEM: "+Agent.prob.getName());
-                FigFrames.get(figureA.getName()).get(objectA.getName()).transformationMatrix.get(figureB.getName()).put("deleted","1"); //marking it as deleted since no match
+            if(nomatch) {
+                System.out.println("NO MATCH WAS FOUND FOR OBJECT: " + objectA.getName() +" of shape: "+ objectA.getAttributes().get("shape") + " IN FIGURE: " + figureA.getName()
+                        + " TO ANY OBJECT IN FIGURE: " + figureB.getName() + " FOR PROBLEM: " + prob.getName());
+                try {
+                    FigFrames.get(figureA.getName()).get(objectA.getName()).transformationMatrix.get(figureB.getName()).put("deleted", "1"); //marking it as deleted since no match
+
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    System.out.println("ERROR PROBLEM " + prob.getName());
+                    System.out.println("FIGURE 1: "+figureA.getName()+"| FIGURE 2: "+figureB.getName());
+                    System.out.println(e.getMessage());
+                }
             }
             else {
                 Map.Entry<String, Integer> maxMatch = (Map.Entry<String, Integer>) scores.entrySet().toArray()[0];
@@ -255,24 +293,32 @@ public class Agent {
         }
         return 0;
     }
-    public int formTransformations(HashMap<String, Frame> FigAframes, HashMap<String, Frame> FigBframes)
+    public int formTransformations(HashMap<String, Frame> FigAframes,String Aname, HashMap<String, Frame> FigBframes, String Bname)
     {
         for(Map.Entry<String, Frame> FigAObj: FigAframes.entrySet())
         {
             String ObjAName = FigAObj.getKey();
             Frame ObjA = FigAObj.getValue();
-            String FigBName = ((Frame)(FigBframes.values().toArray()[0])).fromFigure;
+            String FigBName = "";
+            try {
+                FigBName = Bname;
+            }
+            catch (Exception e)
+            {
+                System.out.println("PROBLEM ERROR IN : "+prob.getName());
+                System.out.println();
+            }
 
             Frame ObjB_A = FigBframes.get(ObjAName);
             if(ObjB_A == null)
             {
-                ObjA.transformationMatrix.get(((Frame)FigBframes.values().toArray()[0]).fromFigure).put("deleted","1");
+                ObjA.transformationMatrix.get(Bname).put("deleted","1");
             }
             else
             {
                 HashMap<String, String> attrA = ObjA.getAttributes();
                 HashMap<String, String> attrB = ObjB_A.getAttributes();
-
+                ObjA.transformationMatrix.get(FigBName).put("deleted","0");
                 for(Map.Entry<String, Integer> rscore : rScores.entrySet()) {
                     double oldScore = ObjA.transformationScore.get(FigBName);
                     if(attrA.containsKey(rscore.getKey())) {
@@ -289,14 +335,15 @@ public class Agent {
                                     break;
                                 case "size":
                                     if (attrA.get(rscore.getKey()).equals(attrB.get(rscore.getKey()))) {
-                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "unchanged");
+                                        ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "0");
                                         ObjA.transformationScore.put(FigBName, oldScore + rscore.getValue() * 1.1);
                                     } else {
-                                        if (Agent.sizeCompare(attrA.get(rscore.getKey()), attrB.get(rscore.getKey())) < 0) {
-                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "increased");
+                                        int t=0;
+                                        if ((t=Agent.sizeCompare(attrA.get(rscore.getKey()), attrB.get(rscore.getKey()))) < 0) {
+                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), Integer.toString(-1*t));
                                             ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.5);
                                         } else {
-                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), "decreased");
+                                            ObjA.transformationMatrix.get(FigBName).put(rscore.getKey(), Integer.toString(-1*t));
                                             ObjA.transformationScore.put(FigBName, oldScore - rscore.getValue() * 0.5);
                                         }
                                     }
@@ -339,41 +386,190 @@ public class Agent {
         }
         return 0;
     }
+
+    /**
+     * Looks at the transformation matrix for figureA to whatever figure BfigName says (most likely B or C)
+     * and then compares that with the transformation matix for figureC(any other figure most likely B or C)
+     * to the figure indicated by candidatefigName (most likely the answer choice figures)
+     * After the comparison, returns a similarity score.
+     * We'd most probably use this score to find closest match for transformation and hence, the answer
+     * IDEA: Assign a threshold minimum similarity to decide if we go ahead with the answer or consider different transitions
+     * @param figureAframes
+     * @param BfigName
+     * @param figureCframes
+     * @param candidatefigName
+     * @return
+     */
+    public double compareTranformations(HashMap<String, Frame> figureAframes, String BfigName,
+                                        HashMap<String, Frame> figureCframes, String candidatefigName)
+    {
+        double score = 0;
+        for(Map.Entry<String, Frame> Aentry: figureAframes.entrySet())
+        {
+            String aobj = Aentry.getKey();
+            Frame aframe = Aentry.getValue();
+            String matchedwith_inC = null;
+            HashMap<String, String> aobj_trans = aframe.transformationMatrix.get(BfigName);
+            HashMap<String, Double> aobj_cobj_Scores = new HashMap<>();
+            for(Map.Entry<String, Frame> Centry: figureCframes.entrySet())
+            {
+                String cobj = Centry.getKey();
+                Frame cframe = Centry.getValue();
+                HashMap<String, String> cobj_trans = cframe.transformationMatrix.get(candidatefigName);
+                aobj_cobj_Scores.put(cobj,0.0);
+                for(Map.Entry<String, String> ctrans: cobj_trans.entrySet())
+                {
+                    double old = aobj_cobj_Scores.get(cobj);
+                    if(aobj_trans.containsKey(ctrans.getKey()))
+                    {
+                        if(ctrans.getKey().equals("size"))
+                        {
+                            if(ctrans.getValue().equals(aobj_trans.get(ctrans.getKey())))
+                            {
+                                aobj_cobj_Scores.put(cobj, old+10);
+                            }
+                            else
+                            {
+                                aobj_cobj_Scores.put(cobj, old + (10-(2*(Integer.parseInt(aobj_trans.get(ctrans.getKey())) - Integer.parseInt(ctrans.getValue())))));
+                            }
+                        }
+                        else
+                        {
+                            if(aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue()))
+                            {
+                                aobj_cobj_Scores.put(cobj, old+10);
+                            }
+                            else
+                            {
+                                aobj_cobj_Scores.put(cobj, old-5);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        aobj_cobj_Scores.put(cobj, old - 10);
+                    }
+                }
+            }
+            matchedwith_inC = maxHashEntry(aobj_cobj_Scores).getKey();
+            score += aobj_cobj_Scores.get(matchedwith_inC);
+        }
+        return score;
+    }
+    public static Map.Entry<String, Double> maxHashEntry(HashMap<String, Double> hash)
+    {
+        Map.Entry<String, Double> maxEntry = (Map.Entry<String, Double>)hash.entrySet().toArray()[0];
+        for(Map.Entry<String, Double> candidate: hash.entrySet())
+        {
+            if(maxEntry.getValue() < candidate.getValue())
+            {
+                maxEntry = candidate;
+            }
+        }
+        return maxEntry;
+    }
+
+    /**
+     * Simply an easy metric to judge size differences
+     * @param sizeA The first size to be compared to the latter
+     * @param sizeB The second size
+     * @return 0 for equal, -1...-4 for increase with -4 being largest increase from a to b and 1...4 for decrease with 4 being largest increase from a to b
+     */
     public static int sizeCompare(String sizeA, String sizeB)
     {
         int ret = 0;
         switch(sizeA)
         {
             case "small":
-                if(sizeB.equals("medium") || sizeB.equals("large")
-                        || sizeB.equals("very large") || sizeB.equals("huge"))
+                if(sizeB.equals("medium"))
                 {
                     ret = -1;
+
+                }
+                else if(sizeB.equals("large"))
+                {
+                    ret = -2;
+                }
+                else if(sizeB.equals("very large"))
+                {
+                    ret = -3;
+                }
+                else if(sizeB.equals("huge"))
+                {
+                    ret = -4;
                 }
                 else ret = 0;
                 break;
             case "medium":
                 if(sizeB.equals("small"))
                     ret = 1;
-                else
+                else if(sizeB.equals("large"))
+                {
                     ret = -1;
+                }
+                else if(sizeB.equals("very large"))
+                {
+                    ret = -2;
+                }
+                else if(sizeB.equals("huge"))
+                {
+                    ret = -3;
+                }
+                else
+                    ret = 0;
                 break;
             case "large":
-                if(sizeB.equals("small") || sizeB.equals("medium"))
+                if(sizeB.equals("medium"))
                 {
                     ret = 1;
                 }
-                else ret = -1;
+                else if(sizeB.equals("small"))
+                {
+                    ret = 2;
+                }
+                else if(sizeB.equals("very large"))
+                {
+                    ret = -1;
+                }
+                else if(sizeB.equals("huge"))
+                {
+                    ret = -2;
+                }
+                else ret = 0;
                 break;
             case "very large":
                 if(sizeB.equals("huge"))
                     ret = -1;
-                else ret = 1;
+                else if(sizeB.equals("large"))
+                {
+                    ret = 1;
+                }
+                else if(sizeB.equals("medium"))
+                {
+                    ret = 2;
+                }
+                else if(sizeB.equals("small"))
+                {
+                    ret = 3;
+                }
+                else ret = 0;
                 break;
             case "huge":
-                if(sizeB.equals("huge"))
-                    ret = 0;
-                else ret = 1;
+                if(sizeB.equals("very large"))
+                    ret = 1;
+                else if(sizeB.equals("large"))
+                {
+                    ret = 2;
+                }
+                else if(sizeB.equals("medium"))
+                {
+                    ret = 3;
+                }
+                else if(sizeB.equals("small"))
+                {
+                    ret =4;
+                }
+                else ret = 0;
                 break;
         }
         return ret;
@@ -456,6 +652,10 @@ public class Agent {
                 String isAbove[] = above.split(",");
                 for(String Above: isAbove) {
                     Frame Aabove = FigFrames.get(fromFigure).get(Above);
+                    if(prob.getName().equals("Basic Problem B-06"))
+                    {
+
+                    }
                     if (Aabove != null) {
                         relationships.get("above").add(Aabove);
                     } else {
@@ -465,9 +665,9 @@ public class Agent {
                 }
             }
             String overlaps = attributes.get("overlaps");
-            if(above !=null)
+            if(overlaps !=null)
             {
-                String isoverlap[] = above.split(",");
+                String isoverlap[] = overlaps.split(",");
                 for(String Aoverlap: isoverlap) {
                     Frame Aoverlaps = FigFrames.get(fromFigure).get(Aoverlap);
                     if (Aoverlaps != null) {
@@ -489,8 +689,56 @@ public class Agent {
                     ", attributes=" + attributes +
                     ", relationships=" + relationships +
                     ", transformationMatrix=" + transformationMatrix +
-                    ", transformationScore=" + transformationScore +
-                    '}').replace(',','\n');
+                    "\n transformationScore=" + transformationScore +
+                    '}');
+        }
+
+        public boolean equals(Frame b)
+        {
+            if(this.name.equals(b.getName()))
+                return true;
+
+            HashMap<String, String> attrA, attrB;
+            attrA = this.attributes;
+            attrB = b.attributes;
+            int currscore = 0;
+
+            if(attrA.size() == attrB.size())
+                currscore += 10;
+            for(String attr: rScores.keySet())
+            {
+                if(attrA.containsKey(attr) && attrB.containsKey(attr)) {
+                    if (attrA.get(attr).equals(attrB.get(attr))) {
+                        currscore += rScores.get(attr);
+
+                    }
+                    else
+                    {
+                        if(attr.equals("inside"))
+                        {
+                            if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                currscore += 5;
+                        }
+                        else if(attr.equals("above"))
+                        {
+                            if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                currscore += 5;
+                        }
+                        else if(attr.equals("overlaps"))
+                        {
+                            if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                currscore += 5;
+                        }
+                        else if(attr.equals("left-of"))
+                        {
+                            if(attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
+                                currscore += 5;
+                        }
+                    }
+                }
+            }
+            System.out.println("SCORE FOR COMPARING "+this.getName()+" to "+b.getName()+" = "+currscore);
+            return currscore>15;
         }
     }
 }
