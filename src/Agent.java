@@ -6,10 +6,7 @@
 import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Your Agent for solving Raven's Progressive Matrices. You MUST modify this
@@ -42,7 +39,7 @@ public class Agent {
         rScores.put("shape", 5);
         rScores.put("alignment",4);
         rScores.put("fill", 3);
-        rScores.put("angle",4);
+        rScores.put("angle",7);
         rScores.put("size", 2);
         rScores.put("inside", 1);
         rScores.put("left-of", 1);
@@ -184,7 +181,7 @@ public class Agent {
         else
             System.out.println(problemType);
 
-        if(problem.getName().equals("Basic Problem B-04"))
+        if(problem.getName().equals("Basic Problem B-06"))
         {
             System.out.println();
         }
@@ -198,14 +195,13 @@ public class Agent {
      * @param figureB Figure whose objects need to be matched with prior figure's
      * @return an integer 0 to confirm success
      */
-    public int objectmatch(RavensFigure figureA, RavensFigure figureB)
-    {
+    public int objectmatch(RavensFigure figureA, RavensFigure figureB) {
         boolean nomatch = true;
-        HashMap<String, HashMap<String, Double>> scores = new HashMap<>();
-        for(Frame objectA: FigFrames.get(figureA.getName()).values()) {
+        HashMap<String, HashMap<String, Integer>> scores = new HashMap<>();
+        for (Frame objectA : FigFrames.get(figureA.getName()).values()) {
             nomatch = true;
             HashMap<String, String> attrA = objectA.getAttributes();
-            scores.put(objectA.getName(), new HashMap<String, Double>());
+            scores.put(objectA.getName(), new HashMap<String, Integer>());
             /**
              * Instantiating the transformation matric of inner class Frame for each frame in figureA
              * to represent transformations to its corresponding object in figureB
@@ -219,15 +215,14 @@ public class Agent {
             for (Frame objectB : FigFrames.get(figureB.getName()).values()) {
                 int currscore = 0;
                 HashMap<String, String> attrB = objectB.getAttributes();
-                if (attrA.size() == attrB.size())
-                    currscore += 20;
                 for (String attr : rScores.keySet()) {
+                    if(attrA.size() == attrB.size())
+                    {
+                        currscore += 100;
+                    }
                     if (attrA.containsKey(attr) && attrB.containsKey(attr)) {
                         if (attrA.get(attr).equals(attrB.get(attr))) {
-                            currscore += rScores.get(attr);
-                            if (attr.equals("shape")) {
-                                nomatch = false;
-                            }
+                            currscore += rScores.get(attr)*2;
                         } else {
                             if (attr.equals("inside")) {
                                 if (attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
@@ -243,103 +238,49 @@ public class Agent {
                                     currscore += 5;
                             }
                         }
+                    } else {
+                        currscore -= 0;
                     }
                 }
-                scores.get(objectA.getName()).put(objectB.getName(), (double)currscore);
-            }
-            if (nomatch) {
-                System.out.println("NO MATCH WAS FOUND FOR OBJECT: " + objectA.getName() + " of shape: " + objectA.getAttributes().get("shape") + " IN FIGURE: " + figureA.getName()
-                        + " TO ANY OBJECT IN FIGURE: " + figureB.getName() + " FOR PROBLEM: " + prob.getName());
-                try {
-                    FigFrames.get(figureA.getName()).get(objectA.getName()).transformationMatrix.get(figureB.getName()).put("deleted", "1"); //marking it as deleted since no match
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    System.out.println("ERROR PROBLEM " + prob.getName());
-                    System.out.println("FIGURE 1: " + figureA.getName() + "| FIGURE 2: " + figureB.getName());
-                    System.out.println(e.getMessage());
-                }
+                scores.get(objectA.getName()).put(objectB.getName(), currscore);
             }
         }
 
-        for(Frame objectA: FigFrames.get(figureA.getName()).values()) {
-            if (objectA.transformationMatrix.get("deleted") == null || objectA.transformationMatrix.get("deleted").equals("0")) {
-                Map.Entry<String, Double> maxMatch = maxHashEntry(scores.get(objectA.getName()));
-                String betterAmatch = objectA.getName();
-                for (Frame objA : FigFrames.get(figureA.getName()).values()) {
-                    if(scores.get(objA.getName()).size()>0) {
-                        try {
-                            Map.Entry<String, Double> alternativeMax = maxHashEntry(scores.get(objA.getName()));
+        for (Frame objectA : FigFrames.get(figureA.getName()).values()) {
+            boolean matched = false;
+            if (true) {
+                Map<String, Integer> objAscores = sortByComparator(scores.get(objectA.getName()), false);
+
+                for(Map.Entry<String, Integer> entr: objAscores.entrySet()){
+
+                    Map.Entry<String, Integer> maxMatch = entr;
+                    String betterAmatch = objectA.getName();
+                    for (Frame objA : FigFrames.get(figureA.getName()).values()) {
+                        if (!objA.getName().equals(objectA.getName())) {
+
+                            Map.Entry<String, Integer> alternativeMax = (Map.Entry<String, Integer>)sortByComparator(scores.get(objA.getName()),false).entrySet().toArray()[0];
 
                             if (maxMatch.getKey().equals(alternativeMax.getKey())) {
                                 if (maxMatch.getValue() < alternativeMax.getValue()) {
                                     betterAmatch = objA.getName();
-                                }
-                            }
-                        } catch (Exception e) {
-                            System.out.println();
-                        }
-                    }
-                }
-                // We have a match for objectA in figureB. Now change name of matched obj to match objectA
-                if (betterAmatch.equals(objectA.getName()) && FigFrames.get(figureB.getName()).get(maxMatch.getKey()).getAttributes().get("shape").equals(objectA.getAttributes().get("shape"))) {
-                    HashMap<String, Frame> figBFrames = FigFrames.get(figureB.getName());
-                    Frame targetFrame = figBFrames.get(maxMatch.getKey());
-                    if (targetFrame != null) {
-                        targetFrame.setName(objectA.getName());       //Set the new name of frame in figureB
-                        figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
-                        if(!maxMatch.getKey().equals(objectA.getName())) {
-                            figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
-                        }
-                        /**
-                         * Fix relationship names in entire stupid frame structure
-                         * by changing the attributes hashmap for each affected frame in figureB
-                         */
-                        for (Frame fr : figBFrames.values()) {
-                            for (Map.Entry<String, String> entry : fr.getAttributes().entrySet()) {
-                                if (entry.getKey().equals("inside") || entry.getKey().equals("above") || entry.getKey().equals("left-of") ||
-                                        entry.getKey().equals("overlaps"))
-                                    if (entry.getValue().contains(maxMatch.getKey())) {
-                                        fr.getAttributes().put(entry.getKey(), entry.getValue().replace(maxMatch.getKey(), objectA.getName()));
-                                    }
-                            }
-                        }
-                    }
-                }
-                else if(!betterAmatch.equals(objectA.getName())){
-                    boolean done= false;
-                    scores.get(objectA.getName()).remove(maxMatch.getKey());
-                    while(scores.get(objectA.getName()).size()>0 && !done)
-                    {
-                        maxMatch = maxHashEntry(scores.get(objectA.getName()));
-
-
-                        /**
-                         * REPEAT PREVIOUS STUFF HERE TO KEEP SEARCHING TILL WE RUN THE * OUT
-                         */
-
-                        betterAmatch = objectA.getName();
-                        for (Frame objA : FigFrames.get(figureA.getName()).values()) {
-                            if(scores.get(objA.getName()).size()>0) {
-                                Map.Entry<String, Double> alternativeMax = maxHashEntry(scores.get(objA.getName()));
-                                if (maxMatch.getKey().equals(alternativeMax.getKey())) {
-                                    if (maxMatch.getValue() < alternativeMax.getValue()) {
-                                        betterAmatch = objA.getName();
-                                    }
+                                    break;
                                 }
                             }
                         }
-                        // We have a match for objectA in figureB. Now change name of matched obj to match objectA
+                    }
+                    // We have a match for objectA in figureB. Now change name of matched obj to match objectA
+                    if (FigFrames.get(figureB.getName()).get(maxMatch.getKey()) != null) {
                         if (betterAmatch.equals(objectA.getName()) && FigFrames.get(figureB.getName()).get(maxMatch.getKey()).getAttributes().get("shape").equals(objectA.getAttributes().get("shape"))) {
+                            matched = true;
                             HashMap<String, Frame> figBFrames = FigFrames.get(figureB.getName());
                             Frame targetFrame = figBFrames.get(maxMatch.getKey());
                             if (targetFrame != null) {
                                 targetFrame.setName(objectA.getName());       //Set the new name of frame in figureB
                                 figBFrames.put(objectA.getName(), figBFrames.get(maxMatch.getKey()));  //Put the modified frame as value to key with new name in figBframes
-                                if(!maxMatch.getKey().equals(objectA.getName())) {
+                                if (!maxMatch.getKey().equals(objectA.getName())) {
                                     figBFrames.remove(maxMatch.getKey());                               //Finally, remove the modified frame from the old obsolete key
                                 }
-                                 /**
+                                /**
                                  * Fix relationship names in entire stupid frame structure
                                  * by changing the attributes hashmap for each affected frame in figureB
                                  */
@@ -353,18 +294,49 @@ public class Agent {
                                     }
                                 }
                             }
-                            done = true;
-                        }
-                        else if(!betterAmatch.equals(objectA.getName()))
-                        {
-                            scores.get(objectA.getName()).remove(maxMatch.getKey());
                         }
                     }
-
+                    if(matched)
+                        break;
+                }
+                if (!matched) {
+                    objectA.transformationMatrix.get(figureB.getName()).put("deleted", "1");
                 }
             }
         }
         return 0;
+    }
+    private static Map<String, Integer> sortByComparator(Map<String, Integer> unsortMap, final boolean order)
+    {
+
+        List<Map.Entry<String, Integer>> list = new LinkedList<Map.Entry<String, Integer>>(unsortMap.entrySet());
+
+        // Sorting the list based on values
+        Collections.sort(list, new Comparator<Map.Entry<String, Integer>>()
+        {
+            public int compare(Map.Entry<String, Integer> o1,
+                               Map.Entry<String, Integer> o2)
+            {
+                if (order)
+                {
+                    return o1.getValue().compareTo(o2.getValue());
+                }
+                else
+                {
+                    return o2.getValue().compareTo(o1.getValue());
+
+                }
+            }
+        });
+
+        // Maintaining insertion order with the help of LinkedList
+        Map<String, Integer> sortedMap = new LinkedHashMap<String, Integer>();
+        for (Map.Entry<String, Integer> entry : list)
+        {
+            sortedMap.put(entry.getKey(), entry.getValue());
+        }
+
+        return sortedMap;
     }
     public int formTransformations(HashMap<String, Frame> FigAframes,String Aname, HashMap<String, Frame> FigBframes, String Bname)
     {
@@ -554,10 +526,12 @@ public class Agent {
     }
     public static Map.Entry<String, Double> maxHashEntry(HashMap<String, Double> hash)
     {
-        Map.Entry<String, Double> maxEntry = (Map.Entry<String, Double>)hash.entrySet().toArray()[0];
+        if(hash.size()<1)
+            return null;
+        Map.Entry<String, Double> maxEntry = null;
         for(Map.Entry<String, Double> candidate: hash.entrySet())
         {
-            if(maxEntry.getValue() < candidate.getValue())
+            if(maxEntry==null || maxEntry.getValue().compareTo(candidate.getValue()) < 0)
             {
                 maxEntry = candidate;
             }
