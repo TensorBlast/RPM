@@ -134,8 +134,6 @@ public class Agent {
              * Match objects from figures A to B and from A to C
              * Later we match them from C to answer choices
              */
-            objectmatch(figureA, figureB);
-            objectmatch(figureA, figureC);
             for(Map.Entry<String,HashMap<String, Frame>> fr: FigFrames.entrySet())
             {
                 for(Frame f: fr.getValue().values())
@@ -143,7 +141,9 @@ public class Agent {
                     f.formRelationships();
                 }
             }
+            objectmatch(figureA, figureB);
             formTransformations(figureAFrames, "A", figureBFrames, "B");
+            objectmatch(figureA, figureC);
             formTransformations(figureAFrames, "A", figureCFrames, "C");
 //            for(Frame frame: figureAFrames.values())
 //            {
@@ -156,6 +156,7 @@ public class Agent {
             {
                 A_B += ina.transformationScore.get("B");
                 A_C += ina.transformationScore.get("C");
+                System.out.println(ina.transformationScore);
             }
             for(RavensFigure answerchoice: answerChoices)
             {
@@ -181,7 +182,7 @@ public class Agent {
         else
             System.out.println(problemType);
 
-        if(problem.getName().equals("Basic Problem B-06"))
+        if(problem.getName().equals("Basic Problem B-12"))
         {
             System.out.println();
         }
@@ -211,22 +212,37 @@ public class Agent {
             //to figureB in terms of attribute:changes or 0 for none
             objectA.transformationMatrix.put(figureB.getName(), new HashMap<String, String>());
             objectA.transformationScore.put(figureB.getName(), 0.0);
-
+            String objectAshape = objectA.getAttributes().get("shape");
+            int sizeweight = 1;
             for (Frame objectB : FigFrames.get(figureB.getName()).values()) {
                 int currscore = 0;
                 HashMap<String, String> attrB = objectB.getAttributes();
+                String objectBshape = attrB.get("shape");
+                if(objectAshape.equals(objectBshape))
+                {
+                    currscore += 20;
+                    if(objectAshape.equals("circle"))
+                        sizeweight = 10;
+                    else sizeweight = 1;
+                }
                 for (String attr : rScores.keySet()) {
-                    if(attrA.size() == attrB.size())
-                    {
-                        currscore += 100;
-                    }
+//                    if(attrA.size() == attrB.size())
+//                    {
+//                        currscore += 10;
+//                    }
                     if (attrA.containsKey(attr) && attrB.containsKey(attr)) {
                         if (attrA.get(attr).equals(attrB.get(attr))) {
-                            currscore += rScores.get(attr)*2;
+                            if(attr.equals("size"))
+                            {
+                                currscore += rScores.get(attr) * sizeweight;
+                                System.out.println(sizeweight);
+                            }
+                            else
+                                currscore += rScores.get(attr)*2;
                         } else {
                             if (attr.equals("inside")) {
                                 if (attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
-                                    currscore += 5;
+                                    currscore += 15;
                             } else if (attr.equals("above")) {
                                 if (attrA.get(attr).split(",").length == attrB.get(attr).split(",").length)
                                     currscore += 7;
@@ -239,7 +255,7 @@ public class Agent {
                             }
                         }
                     } else {
-                        currscore -= 0;
+                        currscore -= 10;
                     }
                 }
                 scores.get(objectA.getName()).put(objectB.getName(), currscore);
@@ -306,6 +322,14 @@ public class Agent {
         }
         return 0;
     }
+
+    /**
+     * Public algorithm to sort hashmap by value
+     * Found here http://stackoverflow.com/questions/8119366/sorting-hashmap-by-values
+     * @param unsortMap
+     * @param order
+     * @return
+     */
     private static Map<String, Integer> sortByComparator(Map<String, Integer> unsortMap, final boolean order)
     {
 
@@ -338,8 +362,7 @@ public class Agent {
 
         return sortedMap;
     }
-    public int formTransformations(HashMap<String, Frame> FigAframes,String Aname, HashMap<String, Frame> FigBframes, String Bname)
-    {
+    public int formTransformations(HashMap<String, Frame> FigAframes,String Aname, HashMap<String, Frame> FigBframes, String Bname) {
         for(Map.Entry<String, Frame> FigAObj: FigAframes.entrySet())
         {
             String ObjAName = FigAObj.getKey();
@@ -458,64 +481,95 @@ public class Agent {
             String matchedwith_inC = null;
             HashMap<String, String> aobj_trans = aframe.transformationMatrix.get(BfigName);
             HashMap<String, Double> aobj_cobj_Scores = new HashMap<>();
-            for(Map.Entry<String, Frame> Centry: figureCframes.entrySet())
-            {
-                String cobj = Centry.getKey();
-                Frame cframe = Centry.getValue();
+            if(figureCframes.containsKey(aobj)) {
+                String cobj = aobj;
+                Frame cframe = figureCframes.get(cobj);
                 HashMap<String, String> cobj_trans = cframe.transformationMatrix.get(candidatefigName);
-                aobj_cobj_Scores.put(cobj,0.0);
-                for(Map.Entry<String, String> ctrans: cobj_trans.entrySet())
-                {
+                aobj_cobj_Scores.put(cobj, 0.0);
+                for (Map.Entry<String, String> ctrans : cobj_trans.entrySet()) {
                     double old = aobj_cobj_Scores.get(cobj);
-                    if(aobj_trans.containsKey(ctrans.getKey()))
-                    {
-                        if(ctrans.getKey().equals("size"))
-                        {
-                            if(ctrans.getValue().equals(aobj_trans.get(ctrans.getKey())))
-                            {
-                                aobj_cobj_Scores.put(cobj, old+10);
+                    if (aobj_trans.containsKey(ctrans.getKey())) {
+                        if (ctrans.getKey().equals("size")) {
+                            if (ctrans.getValue().equals(aobj_trans.get(ctrans.getKey()))) {
+                                aobj_cobj_Scores.put(cobj, old + 10);
+                            } else {
+                                aobj_cobj_Scores.put(cobj, old + (10 - (2 * (Math.abs(Integer.parseInt(aobj_trans.get(ctrans.getKey())) - Integer.parseInt(ctrans.getValue()))))));
                             }
-                            else
-                            {
-                                aobj_cobj_Scores.put(cobj, old + (10-(2*Math.abs(Integer.parseInt(aobj_trans.get(ctrans.getKey())) - Integer.parseInt(ctrans.getValue())))));
-                            }
-                        }
-                        else if(ctrans.getKey().equals("angle"))
-                        {
-                            if(aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue()))
-                            {
-                                aobj_cobj_Scores.put(cobj, old+20);
-                            }
-                            else if(aobj_trans.get(ctrans.getKey()).startsWith("rotated") && ctrans.getValue().startsWith("rotated"))
-                            {
+                        } else if (ctrans.getKey().equals("angle")) {
+                            if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                aobj_cobj_Scores.put(cobj, old + 20);
+                            } else if (aobj_trans.get(ctrans.getKey()).startsWith("rotated") && ctrans.getValue().startsWith("rotated")) {
                                 System.out.println(ctrans.getValue());
                                 int a_b_angle = Integer.parseInt(aobj_trans.get(ctrans.getKey()).substring(7));
                                 int c_candidate = Integer.parseInt(ctrans.getValue().substring(7));
-                                if(Math.abs(a_b_angle - c_candidate) == 0)
-                                {
-                                    aobj_cobj_Scores.put(cobj, old+10);
+                                if (Math.abs(a_b_angle - c_candidate) == 0) {
+                                    aobj_cobj_Scores.put(cobj, old + 10);
                                 }
+                            } else {
+                                aobj_cobj_Scores.put(cobj, old - 5);
                             }
-                            else
-                            {
+                        } else if (ctrans.getKey().equals("deleted")) {
+                            if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                aobj_cobj_Scores.put(cobj, old + 5);
+                            } else {
+                                aobj_cobj_Scores.put(cobj, old - 5);
+                            }
+                        } else {
+                            if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                aobj_cobj_Scores.put(cobj, old + 10);
+                            } else {
                                 aobj_cobj_Scores.put(cobj, old - 5);
                             }
                         }
-                        else
-                        {
-                            if(aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue()))
-                            {
-                                aobj_cobj_Scores.put(cobj, old+10);
-                            }
-                            else
-                            {
-                                aobj_cobj_Scores.put(cobj, old-5);
-                            }
-                        }
+                    } else {
+                        aobj_cobj_Scores.put(cobj, old - 20);
                     }
-                    else
-                    {
-                        aobj_cobj_Scores.put(cobj, old - 10);
+                }
+            }
+            else {
+                for (Map.Entry<String, Frame> Centry : figureCframes.entrySet()) {
+                    String cobj = Centry.getKey();
+                    Frame cframe = Centry.getValue();
+                    HashMap<String, String> cobj_trans = cframe.transformationMatrix.get(candidatefigName);
+                    aobj_cobj_Scores.put(cobj, 0.0);
+                    for (Map.Entry<String, String> ctrans : cobj_trans.entrySet()) {
+                        double old = aobj_cobj_Scores.get(cobj);
+                        if (aobj_trans.containsKey(ctrans.getKey())) {
+                            if (ctrans.getKey().equals("size")) {
+                                if (ctrans.getValue().equals(aobj_trans.get(ctrans.getKey()))) {
+                                    aobj_cobj_Scores.put(cobj, old + 10);
+                                } else {
+                                    aobj_cobj_Scores.put(cobj, old + (10 - (2 * (Math.abs(Integer.parseInt(aobj_trans.get(ctrans.getKey())) - Integer.parseInt(ctrans.getValue()))))));
+                                }
+                            } else if (ctrans.getKey().equals("angle")) {
+                                if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                    aobj_cobj_Scores.put(cobj, old + 20);
+                                } else if (aobj_trans.get(ctrans.getKey()).startsWith("rotated") && ctrans.getValue().startsWith("rotated")) {
+                                    System.out.println(ctrans.getValue());
+                                    int a_b_angle = Integer.parseInt(aobj_trans.get(ctrans.getKey()).substring(7));
+                                    int c_candidate = Integer.parseInt(ctrans.getValue().substring(7));
+                                    if (Math.abs(a_b_angle - c_candidate) == 0) {
+                                        aobj_cobj_Scores.put(cobj, old + 10);
+                                    }
+                                } else {
+                                    aobj_cobj_Scores.put(cobj, old - 5);
+                                }
+                            } else if (ctrans.getKey().equals("deleted")) {
+                                if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                    aobj_cobj_Scores.put(cobj, old + 5);
+                                } else {
+                                    aobj_cobj_Scores.put(cobj, old - 5);
+                                }
+                            } else {
+                                if (aobj_trans.get(ctrans.getKey()).equals(ctrans.getValue())) {
+                                    aobj_cobj_Scores.put(cobj, old + 10);
+                                } else {
+                                    aobj_cobj_Scores.put(cobj, old - 5);
+                                }
+                            }
+                        } else {
+                            aobj_cobj_Scores.put(cobj, old - 20);
+                        }
                     }
                 }
             }
