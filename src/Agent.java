@@ -265,7 +265,7 @@ public class Agent {
         for (Frame objectA : FigFrames.get(figureA.getName()).values()) {
             boolean matched = false;
             if (true) {
-                Map<String, Integer> objAscores = sortByComparator(scores.get(objectA.getName()), false);
+                Map<String, Integer> objAscores = sortByComparator(scores.get(objectA.getName()));
 
                 for(Map.Entry<String, Integer> entr: objAscores.entrySet()){
 
@@ -274,7 +274,7 @@ public class Agent {
                     for (Frame objA : FigFrames.get(figureA.getName()).values()) {
                         if (!objA.getName().equals(objectA.getName())) {
 
-                            Map.Entry<String, Integer> alternativeMax = (Map.Entry<String, Integer>)sortByComparator(scores.get(objA.getName()),false).entrySet().toArray()[0];
+                            Map.Entry<String, Integer> alternativeMax = (Map.Entry<String, Integer>)sortByComparator(scores.get(objA.getName())).entrySet().toArray()[0];
 
                             if (maxMatch.getKey().equals(alternativeMax.getKey())) {
                                 if (maxMatch.getValue() < alternativeMax.getValue()) {
@@ -324,34 +324,19 @@ public class Agent {
     }
 
     /**
-     * Public algorithm to sort hashmap by value
+     * Public algorithm to sort hashmap by value implemented here using lambda comparators
      * Found here http://stackoverflow.com/questions/8119366/sorting-hashmap-by-values
      * @param unsortMap
-     * @param order
+     *
      * @return
      */
-    private static Map<String, Integer> sortByComparator(Map<String, Integer> unsortMap, final boolean order)
+    private static Map<String, Integer> sortByComparator(Map<String, Integer> unsortMap)
     {
 
         List<Map.Entry<String, Integer>> list = new LinkedList<Map.Entry<String, Integer>>(unsortMap.entrySet());
 
         // Sorting the list based on values
-        Collections.sort(list, new Comparator<Map.Entry<String, Integer>>()
-        {
-            public int compare(Map.Entry<String, Integer> o1,
-                               Map.Entry<String, Integer> o2)
-            {
-                if (order)
-                {
-                    return o1.getValue().compareTo(o2.getValue());
-                }
-                else
-                {
-                    return o2.getValue().compareTo(o1.getValue());
-
-                }
-            }
-        });
+        Collections.sort(list,(Map.Entry<String, Integer> o1,Map.Entry<String, Integer> o2) -> o2.getValue().compareTo(o1.getValue()));
 
         // Maintaining insertion order with the help of LinkedList
         Map<String, Integer> sortedMap = new LinkedHashMap<String, Integer>();
