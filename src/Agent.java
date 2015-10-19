@@ -163,32 +163,62 @@ public class Agent {
                 objectmatch(figureC, answerchoice);
                 formTransformations(figureCFrames,"C", FigFrames.get(answerchoice.getName()),answerchoice.getName());
                 double score = compareTranformations(figureAFrames, "B", figureCFrames, answerchoice.getName());
-                System.out.println("SCORE FOR A->B with C->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
+                //System.out.println("SCORE FOR A->B with C->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
                 answerscores.put(answerchoice.getName(),score*A_B);
             }
 
             for(RavensFigure answerchoice: answerChoices)
             {
                 objectmatch(figureB, answerchoice);
-                System.out.println("DOING A->C tranformation analysis FOR "+answerchoice.getName());
+                //System.out.println("DOING A->C tranformation analysis FOR "+answerchoice.getName());
                 formTransformations(figureBFrames,"B", FigFrames.get(answerchoice.getName()),answerchoice.getName());
                 double score = compareTranformations(figureAFrames, "C", figureBFrames, answerchoice.getName());
-                System.out.println("SCORE FOR A->C with B->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
+                //System.out.println("SCORE FOR A->C with B->"+answerchoice.getName()+": "+score+" FOR PROBLEM: "+problemName);
                 answerscores.put(answerchoice.getName(),answerscores.get(answerchoice.getName())+(score*A_C));
             }
             Map.Entry<String, Double> bestEntryGuess = maxHashEntry(answerscores);
             bestGuess = Integer.parseInt(bestEntryGuess.getKey());
+            if(problem.getName().equals("Basic Problem B-10"))
+            {
+                System.out.println("A_B: "+A_B+" | A_C: "+A_C);
+                System.out.println(answerscores);
+                System.out.println(bestGuess);
+                //formTransformations(figureAFrames, "A", figureBFrames, "B");
+            }
         }
         else
-            System.out.println(problemType);
-
-        if(problem.getName().equals("Basic Problem B-12"))
         {
-            System.out.println();
+            return solve3x3(problem);
         }
+
         return bestGuess;
     }
 
+    public int solve3x3(RavensProblem problem)
+    {
+        if(problem.hasVisual())
+        {
+            RavensFigure figureA = problem.getFigures().get("A");
+            RavensFigure figureB = problem.getFigures().get("B");
+            RavensFigure figureC = problem.getFigures().get("C");
+            RavensFigure figureD = problem.getFigures().get("D");
+            RavensFigure figureE = problem.getFigures().get("E");
+            RavensFigure figureF = problem.getFigures().get("F");
+            RavensFigure figureG = problem.getFigures().get("G");
+            RavensFigure figureH = problem.getFigures().get("H");
+
+            RavensFigure figure1 = problem.getFigures().get("1");
+            RavensFigure figure2 = problem.getFigures().get("2");
+            RavensFigure figure3 = problem.getFigures().get("3");
+            RavensFigure figure4 = problem.getFigures().get("4");
+            RavensFigure figure5 = problem.getFigures().get("5");
+            RavensFigure figure6 = problem.getFigures().get("6");
+            RavensFigure figure7 = problem.getFigures().get("7");
+            RavensFigure figure8 = problem.getFigures().get("8");
+
+        }
+        return -1;
+    }
     /**
      * Matching the objects within figureA to those inside figureB. We change the names of the objects in B to match those
      * in A.
